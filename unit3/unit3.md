@@ -1,4 +1,4 @@
-# Unit 3 - Identity and Access Management
+# Unit 3 - User Access and System Integration
 
 ## Overview
 
