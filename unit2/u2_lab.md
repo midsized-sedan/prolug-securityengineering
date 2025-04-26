@@ -137,93 +137,115 @@ Rule Title
   - RHEL 9 must be configured to use TCP syncookies.
 
 What is the problem?
-  - 
+  - Denial of Service can happen by an actor flooding a system with TCP SYN (connection
+  requests) without completing the handshake (never sending back an ACK)
+  -This normally would mean the system would allocate resources for every SYN
+  it recieves, and eventually all resources would be used up.
+  - Syncookies mean that the system will send back a SYN-ACK with a special
+  Initial Squence Number (ISN) that encodes info. If the client is legit, then it
+  will send back an ACK, to which the server will then verify the handshake and 
+  allocate resources.
 
 What is the fix?
-  - 
+  - Verify that RHEL 9 is configured to use syncookies.
+  - ensure that `sysctl net.ipv4.tcp_syncookies` is set to 1
 
 What type of control is being implemented?
-  - 
+  - Technical Preventative
 
 Is it set properly on your system?
-  - 
+  - Yes
 
 `sysctl -a | grep -i ipv4 | grep -i syncookies`
 
 Can you remediate this finding?
-  - 
+  - Nothing to remediate
 
 **Check and remediate V-257958 STIG**
 
 Rule Title
-  - 
+  - RHEL 9 must ignore Internet Protocol version 4 (IPv4) Internet Control 
+  Message Protocol (ICMP) redirect messages.
 
 What is the problem?
-  - 
+  - ipv4 redirect messages modify the host's route table and are unauthenticated.
+  - this means ilicit ICMP redirect messages could result in a man-in-the-middle attack
 
 What is the fix?
-  - 
+  - check the value of accept_redirects. if 0, then redirects are not allowed.
+  - sysctl net.ipv4.conf.all.accept_redirects
 
 What type of control is being implemented?
-  - 
+  - Technical Preventative
 
 Is it set properly on your system?
-  - 
+  - Yes
 
 How would you go about remediating this on your system?
-  - 
+  - If it was not set properly, you would need to set `net.ipv4.conf.all.accept_redirects = 0`
+  in a config file in `/etc/sysctl.d/`
+  - This system is already set properly
 
 **Check and remediate V-257960 STIG**
 
 Rule Title
-  - 
+  - RHEL 9 must log IPv4 packets with impossible addresses.
 
 What is the problem?
-  - 
+  - martian packets, spoofed packets, source-routed packets, and redirects
+  could be a sign of nefarious network activity. These should be logged.
 
 What is the fix?
-  - 
+  - Ensure logging of martian packets.
 
 What type of control is being implemented?
-  - 
+  - Technical Detective
 
 Is it set properly on your system?
-  - 
+  - No
 
 How would you go about remediating this on your system?
-  - 
+  - Add the following line to the sysctl.conf file in /etc/sysctl.d/
+  `net.ipv4.conf.all.log_martians = 1`
+  - then run `sysctl --system` to reload conf files.
 
 **Check and remediate V-257961 STIG**
 
 Rule Title
-  - 
+  - RHEL 9 must log IPv4 packets with impossible addresses by default.
 
 What is the problem?
-  - 
+  - martian packets, spoofed packets, source-routed packets, and redirects
+  could be a sign of nefarious network activity. These should be logged. 
 
 What is the fix?
-  - 
+  - Check if `net.ipv4.conf.default.log_martians` is set to 1
+  - if not, change the setting
 
 What type of control is being implemented?
-  - 
+  - Technical Detective
 
 Is it set properly on your system?
-  - 
+  - No
 
 How would you go about remediating this on your system?
-  - 
+  - Add the following line to the sysctl.conf file in /etc/sysctl.d/
+  `net.ipv4.conf.default.log_martians = 1`
+  - then run `sysctl --system` to reload conf files.
 
 ### Firewall
 
-**Filter by firwall**
+**Filter by firewall**
 
 How many STIGS do you see?
-  - 
+  - 6
 
 What do these STIGs appear to be trying to do?
-  - 
+  - Ensure that a firewall is installed and running on the system.
+  - Ensure that the firewall be configured properly
+  
 What type of controls are they?
-  - 
+  - Technical Preventative
 
 #### Firewall port exposure
 
@@ -240,30 +262,72 @@ port that node_exporter runs on to the network outside of your system.
 # Verify that your firewall is running
 systemctl status firewalld
 
+
+[root@hammer7 sysctl.d]# systemctl status firewalld
+● firewalld.service - firewalld - dynamic firewall daemon
+     Loaded: loaded (/usr/lib/systemd/system/firewalld.service; enabled; preset: enabled)
+     Active: active (running) since Wed 2025-04-23 15:47:25 MST; 20min ago
+
+---
+
 # Verify that your firewall has the service defined
 firewall-cmd --get-services | grep -i node
 ls /usr/lib/firewalld/services | grep -i node
 
+[root@hammer7 sysctl.d]# ls /usr/lib/firewalld/services/ | grep -i node
+kube-nodeport-services.xml
+prometheus-node-exporter.xml
+
+---
+
 # Verify that the service is not currently enabled for node_exporter
 firewall-cmd --list-services
+
+[root@hammer7 sysctl.d]# firewall-cmd --list-services
+cockpit dhcpv6-client ssh
+
+---
 
 # Examine the structure of the firewall .xml file
 cat /usr/lib/firewalld/services/prometheus-node-exporter.xml
 
+[root@hammer7 sysctl.d]# cat /usr/lib/firewalld/services/prometheus-node-exporter.xml
+<?xml version="1.0" encoding="utf-8"?>
+<service>
+  <short>prometheus-node-exporter</short>
+  <description>The node-exporter agent for Prometheus monitoring system.</description>
+  <port protocol="tcp" port="9100"/>
+</service>
+
+---
+
 # Enable the service through your firewall
 firewall-cmd --permanent --add-service=prometheus-node-exporter
+
+[root@hammer7 sysctl.d]# firewall-cmd --permanent --add-service=prometheus-node-exporter
+success
+
+---
 
 # Reload so the changes take effect
 firewall-cmd --reload
 
+[root@hammer7 sysctl.d]# firewall-cmd --reload
+success
+
+---
+
 # Verify that the service is currently enabled for node_exporter
 firewall-cmd --list-services
+
+[root@hammer7 sysctl.d]# firewall-cmd --list-services
+cockpit dhcpv6-client prometheus-node-exporter ssh
 ```
 
 ### Automate STIG remediation on a system
 
 There are many options and the STIG remediation steps are well known. Here the learner will examine
-a a few ways to generate ansible and shell fixes to your system. Then one can apply
+a few ways to generate ansible and shell fixes to your system. Then one can apply
 all of them, or just some of them. This is the real value of a security engineer
 focused Linux engineer, the trade-off between security and productivity.
 
@@ -279,6 +343,14 @@ mkdir ansible
 cp rhel9STIG-ansible.zip ansible/
 cd ansible
 unzip rhel9STIG-ansible.zip
+
+[root@hammer7 ansible]# ll
+total 1536
+-rw-------. 1 root root      40 Mar  7 10:49 ansible.cfg
+-rw-------. 1 root root      45 Mar  7 10:49 enforce.sh
+-rw-r--r--. 1 root root 1559634 Apr 23 16:14 rhel9STIG-ansible.zip
+drwxrwxr-x. 3 root root      60 Mar  7 10:49 roles
+-rw-------. 1 root root      63 Mar  7 10:49 site.yml
 ```
 
 **Examine the default values for STIGS**
@@ -290,10 +362,70 @@ vim main.yml
 
 Search for a few of the STIG numbers you used earlier and see their default values.
 
+```
+# R-257957 RHEL-09-253010
+rhel9STIG_stigrule_257957_Manage: True
+rhel9STIG_stigrule_257957_net_ipv4_tcp_syncookies_Value: 1
+rhel9STIG_stigrule_257957_net_ipv4_tcp_syncookies_File: /etc/sysctl.d/99-sysctl.conf
+# R-257958 RHEL-09-253015
+rhel9STIG_stigrule_257958_Manage: True
+rhel9STIG_stigrule_257958_net_ipv4_conf_all_accept_redirects_Value: 0
+rhel9STIG_stigrule_257958_net_ipv4_conf_all_accept_redirects_File: /etc/sysctl.d/99-sysctl.conf
+
+# R-257960 RHEL-09-253025
+rhel9STIG_stigrule_257960_Manage: True
+rhel9STIG_stigrule_257960_net_ipv4_conf_all_log_martians_Value: 1
+rhel9STIG_stigrule_257960_net_ipv4_conf_all_log_martians_File: /etc/sysctl.d/99-sysctl.conf
+# R-257961 RHEL-09-253030
+rhel9STIG_stigrule_257961_Manage: True
+rhel9STIG_stigrule_257961_net_ipv4_conf_default_log_martians_Value: 1
+rhel9STIG_stigrule_257961_net_ipv4_conf_default_log_martians_File: /etc/sysctl.d/99-sysctl.conf
+```
+
 **Examine the playbook to see how those are applied to a running system.**
 
 ```
 vim /root/stigs/ansible/roles/rhel9STIG/tasks/main.yml
+
+
+# R-257957 RHEL-09-253010
+- name: stigrule_257957_net_ipv4_tcp_syncookies
+  sysctl:
+    name: net.ipv4.tcp_syncookies
+    value: "{{ rhel9STIG_stigrule_257957_net_ipv4_tcp_syncookies_Value }}"
+    sysctl_file: "{{ rhel9STIG_stigrule_257957_net_ipv4_tcp_syncookies_File }}"
+  notify: sysctl_load_settings
+  when:
+    - rhel9STIG_stigrule_257957_Manage
+# R-257958 RHEL-09-253015
+- name: stigrule_257958_net_ipv4_conf_all_accept_redirects
+  sysctl:
+    name: net.ipv4.conf.all.accept_redirects
+    value: "{{ rhel9STIG_stigrule_257958_net_ipv4_conf_all_accept_redirects_Value }}"
+    sysctl_file: "{{ rhel9STIG_stigrule_257958_net_ipv4_conf_all_accept_redirects_File }}"
+  notify: sysctl_load_settings
+  when:
+    - rhel9STIG_stigrule_257958_Manage
+	
+
+# R-257960 RHEL-09-253025
+- name: stigrule_257960_net_ipv4_conf_all_log_martians
+  sysctl:
+    name: net.ipv4.conf.all.log_martians
+    value: "{{ rhel9STIG_stigrule_257960_net_ipv4_conf_all_log_martians_Value }}"
+    sysctl_file: "{{ rhel9STIG_stigrule_257960_net_ipv4_conf_all_log_martians_File }}"
+  notify: sysctl_load_settings
+  when:
+    - rhel9STIG_stigrule_257960_Manage
+# R-257961 RHEL-09-253030
+- name: stigrule_257961_net_ipv4_conf_default_log_martians
+  sysctl:
+    name: net.ipv4.conf.default.log_martians
+    value: "{{ rhel9STIG_stigrule_257961_net_ipv4_conf_default_log_martians_Value }}"
+    sysctl_file: "{{ rhel9STIG_stigrule_257961_net_ipv4_conf_default_log_martians_File }}"
+  notify: sysctl_load_settings
+  when:
+    - rhel9STIG_stigrule_257961_Manage
 ```
 
 **Create an Ansible playbook from OpenSCAP**
@@ -315,6 +447,12 @@ oscap xccdf generate fix --profile ospp --fix-type bash /usr/share/xml/scap/ssg/
 
 # Examine the file
 vim draf-disa-remediate.sh
+
+
+[root@hammer7 openscap]# ll
+total 604
+-rw-r--r--. 1 root root 238130 Apr 23 16:23 draft-disa-remediate.sh
+-rw-r--r--. 1 root root 376028 Apr 23 16:22 draft-disa-remediate.yml
 ```
 
 

@@ -121,11 +121,15 @@ ngrep:
 
 ## Digging Deeper
 
-1. See if you can fidn any DNS exploits that have been used and written up in the diamond model
+1. See if you can find any DNS exploits that have been used and written up in the diamond model
 of intrusion analysis format. If you can , what are the primary actors and actions that made up the attack?
 
 ## Reflection Questions
 
 1. What questions do you still have about this week?
 
+Honestly, I'm just overall confused and not sure what to ask.
+
 2. How are you going to use what you've learned in your current role?
+
+Nothing yet.
